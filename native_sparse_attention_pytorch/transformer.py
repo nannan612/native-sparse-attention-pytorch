@@ -300,6 +300,7 @@ class Transformer(Module):
         iter_cache = iter(cache)
 
         next_cache = []
+        extra_losses = []
 
         # layers
 
@@ -311,6 +312,11 @@ class Transformer(Module):
                 return_cache = True,
                 **attn_kwargs
             )
+
+            if hasattr(attn, 'pop_extra_loss'):
+                maybe_loss = attn.pop_extra_loss()
+                if exists(maybe_loss):
+                    extra_losses.append(maybe_loss)
 
             next_cache.append(layer_cache)
 
@@ -327,4 +333,9 @@ class Transformer(Module):
 
             return logits, next_cache
 
-        return F.cross_entropy(rearrange(logits, 'b n l -> b l n'), labels)
+        loss = F.cross_entropy(rearrange(logits, 'b n l -> b l n'), labels)
+
+        if len(extra_losses) > 0:
+            loss = loss + sum(extra_losses)
+
+        return loss
